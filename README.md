@@ -9,6 +9,17 @@ header、param
 
 ### 使用方式
 
+应用依赖redis
+
+```properties
+spring.redis.host = xxxx
+spring.redis.port = xxx
+spring.redis.password = xxx
+spring.redis.database = 2
+```
+
+**如果应用未配置redissonClient则会默认注入一个**
+
 1. 引入stater
 ```java
 <dependency>
