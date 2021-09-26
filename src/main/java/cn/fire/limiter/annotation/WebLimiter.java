@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
  * @Author: wangzc
  * @Date: 2021/9/23 11:39
  */
-@Target({ElementType.METHOD})
+@Target({ElementType.METHOD, ElementType.TYPE})
 @Retention(RetentionPolicy.RUNTIME)
 @Documented
 public @interface WebLimiter {
