@@ -12,12 +12,14 @@ import org.apache.commons.lang3.time.StopWatch;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.aop.aspectj.MethodInvocationProceedingJoinPoint;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.util.DigestUtils;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -47,7 +49,13 @@ public class LockAspect {
     @Autowired
     private RedissonClient redissonClient;
 
-    @Around("@annotation(cn.fire.limiter.annotation.WebLimiter)")
+    @Pointcut("@annotation(cn.fire.limiter.annotation.WebLimiter)")
+    private void methodAnnotation() {}
+
+    @Pointcut("@within(cn.fire.limiter.annotation.WebLimiter)")
+    private void typeAnnotation() {}
+
+    @Around("methodAnnotation() || typeAnnotation()")
     public Object around(ProceedingJoinPoint joinPoint) throws Throwable {
 
         //开始计时
@@ -58,7 +66,14 @@ public class LockAspect {
         MethodSignature signature = (MethodSignature) mjp.getSignature();
         Method method = signature.getMethod();
 
-        WebLimiter webLimiter = method.getAnnotation(WebLimiter.class);
+        //优先从方法上获取注解
+        WebLimiter webLimiter;
+        if (method.isAnnotationPresent(WebLimiter.class)) {
+            webLimiter = method.getAnnotation(WebLimiter.class);
+        } else {
+            webLimiter = AnnotationUtils.findAnnotation(method.getDeclaringClass(), WebLimiter.class);
+        }
+
         if (Objects.isNull(webLimiter)) {
             return joinPoint.proceed();
         }
@@ -75,6 +90,7 @@ public class LockAspect {
         AccessEnum accessStrategy = webLimiter.access();
         UniqueEnum uniqueStrategy = webLimiter.unique();
 
+        //限制了自动装配适用于基于servlet的web应用，可以直接通过threadlocal获取当前线程请求上下文，response同理
         HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder.getRequestAttributes()).getRequest();
 
         if (StringUtils.equalsIgnoreCase(request.getMethod(), "options")) {
@@ -106,6 +122,7 @@ public class LockAspect {
             return null;
         }
 
+        //使用header 或 method param和请求uri 摘要作为锁的key
         String digest = DigestUtils.md5DigestAsHex((key + request.getRequestURI()).getBytes(StandardCharsets.UTF_8));
 
         RLock lock = redissonClient.getLock("access:limiter:" + digest);
@@ -123,7 +140,11 @@ public class LockAspect {
             }
         }
         if (accessStrategy == AccessEnum.QUEUE) {
-            lock.lockInterruptibly(expire, timeUnit);
+            /**
+             * 1、spring mvc使用线程池进行请求处理。当锁未释放时，当前线程被占用，redisson使用threadId对同一个key进行重入判断，因此多次请求不会发生锁重入情况
+             * 2、如果expire时间限制过长，则可能发生阻塞线程过多
+             */
+            lock.lock(expire, timeUnit);
             sw.stop();
             log.info("防重放处理耗时: {} ms", sw.getTime());
             return joinPoint.proceed();
