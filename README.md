@@ -27,7 +27,7 @@ spring.redis.database = 2
     <artifactId>limiter-spring-boot-starter</artifactId>
 </dependency>
 ```
-2. 在需要控制的控制器或类上加入注解
+2. 在需要控制的控制器或类上加入注解，优先使用方法注解
 ```java
 @WebLimiter(expire = 2, timeunit = TimeUnit.SECONDS, handler = DefaultResponseHandler.class, unique = UniqueEnum.HEADER, access = AccessEnum.DENY)
 ```
