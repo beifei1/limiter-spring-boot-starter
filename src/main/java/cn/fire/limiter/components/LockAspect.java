@@ -67,14 +67,11 @@ public class LockAspect {
         Method method = signature.getMethod();
 
         //优先从方法上获取注解
-        WebLimiter webLimiter;
-        if (method.isAnnotationPresent(WebLimiter.class)) {
-            webLimiter = method.getAnnotation(WebLimiter.class);
-        } else {
-            webLimiter = AnnotationUtils.findAnnotation(method.getDeclaringClass(), WebLimiter.class);
-        }
+        WebLimiter webLimiter = (method.isAnnotationPresent(WebLimiter.class) == true ? method.getAnnotation(WebLimiter.class) :
+                AnnotationUtils.findAnnotation(method.getDeclaringClass(), WebLimiter.class));
 
         if (Objects.isNull(webLimiter)) {
+            sw.stop();
             return joinPoint.proceed();
         }
 
