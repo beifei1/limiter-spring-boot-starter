@@ -22,7 +22,7 @@ public class DefaultResponseHandler implements IResponseHandler {
 
     @Override
     public byte[] body() {
-        return "{\"code\":1,msg:\"访问频次超限\"}".getBytes(StandardCharsets.UTF_8);
+        return "{\"code\":1,\"msg\":\"访问频次超限\"}".getBytes(StandardCharsets.UTF_8);
     }
 
     @Override
